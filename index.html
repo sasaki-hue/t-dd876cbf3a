@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>通知設定</title>
+<style>
+:root{--bg:#f4f5f7;--card:#fff;--text:#111;--sub:#5f6672;--mute:#98a0ab;--line:#e3e6ea;--accent:#06c755;--accent-ink:#fff;--chip:#e6f8ed;--chip-ink:#0a7a37;--danger:#c62828;--off:#cfd4da}
+@media (prefers-color-scheme:dark){:root{--bg:#111315;--card:#1b1e21;--text:#f1f3f5;--sub:#a8b0ba;--mute:#727a85;--line:#2c3136;--chip:#12351f;--chip-ink:#7fe0a3;--danger:#ff8a80;--off:#454b52}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic UI",Meiryo,sans-serif;-webkit-text-size-adjust:100%}
+.wrap{max-width:520px;margin:0 auto;padding-bottom:96px}
+header{background:var(--card);padding:14px 16px 0;position:sticky;top:0;z-index:5;border-bottom:1px solid var(--line)}
+h1{font-size:17px;margin:0 0 2px}
+#summary{font-size:13px;color:var(--sub);margin:0 0 10px}
+#summary.warn{color:var(--danger)}
+.tabs{display:flex}
+.tab{flex:1;background:none;border:0;border-bottom:3px solid transparent;padding:10px 0;font:inherit;color:var(--sub);cursor:pointer}
+.tab[aria-selected="true"]{color:var(--text);font-weight:600;border-bottom-color:var(--accent)}
+.tab small{font-weight:400;font-size:12px;color:var(--mute)}
+section{display:none}
+section.on{display:block}
+.card{background:var(--card);margin:12px 12px 0;border-radius:12px;border:1px solid var(--line);overflow:hidden}
+.lbl{font-size:12px;color:var(--sub);padding:12px 14px 6px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;padding:0 14px 12px}
+.chip{background:var(--chip);color:var(--chip-ink);border:0;border-radius:8px;padding:6px 8px;font:inherit;font-size:13px;cursor:pointer;text-align:left}
+.chip::after{content:" ×";opacity:.7}
+.empty{font-size:13px;color:var(--mute);padding:0 14px 12px}
+.more{background:none;border:0;color:var(--sub);font:inherit;font-size:13px;padding:6px 8px;cursor:pointer;text-decoration:underline}
+.prefs{display:flex;flex-wrap:wrap;gap:6px;padding:0 14px 12px}
+.pf{background:none;border:1px solid var(--line);border-radius:8px;padding:7px 11px;font:inherit;font-size:14px;color:var(--sub);cursor:pointer}
+.pf[aria-pressed="true"]{background:var(--text);color:var(--card);border-color:var(--text)}
+.pf b{font-weight:600;color:var(--accent)}
+.pf[aria-pressed="true"] b{color:inherit}
+.q{padding:0 14px 12px}
+.q input{width:100%;height:42px;border:1px solid var(--line);border-radius:8px;padding:0 12px;font:inherit;font-size:16px;background:var(--bg);color:var(--text)}
+.row{display:flex;align-items:center;gap:12px;padding:12px 14px;border-top:1px solid var(--line);cursor:pointer;min-height:48px}
+.row input{width:20px;height:20px;accent-color:var(--accent);flex:none}
+.row .nm{flex:1;min-width:0;word-break:break-all}
+.row small{color:var(--mute);font-size:12px;white-space:nowrap}
+.note{font-size:12px;color:var(--mute);padding:10px 14px;border-top:1px solid var(--line)}
+.mc{display:flex;align-items:center;gap:10px;padding:14px;font-weight:600}
+.mc small{font-weight:400;font-size:12px;color:var(--mute)}
+.aim{display:flex;align-items:center;gap:10px;padding:10px 14px 10px 26px;border-top:1px solid var(--line)}
+.aim small{display:block;font-size:12px;color:var(--mute)}
+.dim{color:var(--mute)}
+.sw{margin-left:auto;flex:none;width:46px;height:28px;border-radius:14px;border:0;background:var(--off);position:relative;cursor:pointer;padding:0}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:left .12s}
+.sw[aria-checked="true"]{background:var(--accent)}
+.sw[aria-checked="true"]::after{left:21px}
+.field{display:flex;align-items:center;gap:10px;padding:14px}
+.field input{width:96px;height:40px;border:1px solid var(--line);border-radius:8px;padding:0 10px;font:inherit;font-size:16px;background:var(--bg);color:var(--text);text-align:right;margin-left:auto}
+.err{color:var(--danger);font-size:13px;padding:0 14px 12px}
+footer{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:10px 12px calc(10px + env(safe-area-inset-bottom))}
+footer .in{max-width:496px;margin:0 auto}
+#save{width:100%;height:46px;border:0;border-radius:10px;background:var(--accent);color:var(--accent-ink);font:inherit;font-size:16px;font-weight:600;cursor:pointer}
+#save:disabled{background:var(--off);cursor:default}
+#state{font-size:12px;color:var(--sub);text-align:center;margin-top:6px;min-height:18px}
+#state.ng{color:var(--danger)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>通知設定</h1>
+    <p id="summary">読み込み中…</p>
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" data-tab="stores" aria-selected="true">店舗 <small id="tc-stores"></small></button>
+      <button class="tab" role="tab" data-tab="machines" aria-selected="false">機種 <small id="tc-machines"></small></button>
+      <button class="tab" role="tab" data-tab="other" aria-selected="false">受け取り方</button>
+    </div>
+  </header>
+
+  <section id="sec-stores" class="on">
+    <div class="card">
+      <div class="lbl">選択中の店舗</div>
+      <div id="chips"></div>
+    </div>
+    <div class="card">
+      <div class="lbl">都道府県</div>
+      <div class="prefs" id="prefs"></div>
+      <div class="q"><input id="q" type="search" placeholder="店舗名で探す" autocomplete="off" aria-label="店舗名で探す"></div>
+      <div id="list"></div>
+      <div class="note" id="listnote"></div>
+    </div>
+  </section>
+
+  <section id="sec-machines">
+    <div id="machines"></div>
+    <p class="note" style="border:0">機種を「入」にすると、その下の狙い方ごとに通知を選べます。</p>
+  </section>
+
+  <section id="sec-other">
+    <div class="card">
+      <div class="mc"><span>通知を一時停止する<br><small>設定は残したまま、すべての通知を止めます</small></span><button class="sw" id="paused" role="switch" aria-checked="false" aria-label="通知を一時停止する"></button></div>
+    </div>
+    <div class="card">
+      <div class="field"><span>期待値の下限<br><small style="color:var(--mute);font-size:12px">これ未満の台は通知しません。空欄 = 指定なし</small></span><input id="minev" type="number" inputmode="numeric" min="0" step="50" placeholder="なし" aria-label="期待値の下限(枚)"><span>枚</span></div>
+      <div class="err" id="minev-err" hidden>0 以上の数字を入れてください</div>
+    </div>
+  </section>
+</div>
+
+<footer><div class="in">
+  <button id="save" disabled>保存する</button>
+  <div id="state"></div>
+</div></footer>
+
+<script>
+// ---- つなぎ先。公開する時はこの 2 つだけ書き換える
+//   LIFF_ID: LINE の中で開くための ID(LINE Developers で発行)。空なら PC 内の試験用(アドレスの uid を使う)
+//   API_URL: 保存先の URL(Apps Script のウェブアプリ)。空なら同じサーバーの /api
+const LIFF_ID = "";
+const API_URL = "";
+
+const uid = new URLSearchParams(location.search).get("uid") || "u1";
+let idToken = null;
+
+async function identify() {
+  if (!LIFF_ID) return;
+  await new Promise((ok, ng) => { const s = document.createElement("script"); s.src = "https://static.line-scdn.net/liff/edge/2/sdk.js"; s.onload = ok; s.onerror = ng; document.head.append(s); });
+  await liff.init({ liffId: LIFF_ID });
+  if (!liff.isLoggedIn()) { liff.login(); await new Promise(() => {}); }
+  idToken = liff.getIDToken();
+}
+
+// 読み込みも保存も、同じ宛先に「何をするか(action)」を付けて送る
+// 本文を text/plain で送るのは、Apps Script が事前確認の通信に応えられないため
+async function call(action, extra = {}) {
+  const auth = LIFF_ID ? { id_token: idToken } : { uid };
+  const r = await fetch(API_URL || "api", { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action, auth, ...extra }) });
+  if (!r.ok) throw new Error(r.status);
+  const j = await r.json();
+  if (j.status === "relogin" && LIFF_ID) { liff.logout(); liff.login(); await new Promise(() => {}); }
+  return j;
+}
+
+const $ = id => document.getElementById(id);
+const el = (tag, props = {}, ...kids) => { const e = Object.assign(document.createElement(tag), props); e.append(...kids); return e; };
+const norm = s => s.normalize("NFKC").toLowerCase().replace(/\s+/g, "");
+const NOPREF = "未設定", ALL = "すべて", LIST_MAX = 60, CHIP_MAX = 8;
+
+let cfg = null, saved = "", pref = ALL, chipsOpen = false;
+const st = { stores: new Set(), machines: {}, min_ev: null, paused: false, send_to: ["line"] };
+
+const snapshot = () => JSON.stringify({ stores: [...st.stores].sort(), machines: st.machines, min_ev: st.min_ev, paused: st.paused, send_to: st.send_to });
+const prefOf = s => s.pref || NOPREF;
+
+function drawSummary() {
+  const onM = cfg.machines.filter(m => st.machines[m.name].on && st.machines[m.name].aims.length);
+  const nAim = onM.reduce((a, m) => a + st.machines[m.name].aims.length, 0);
+  $("tc-stores").textContent = st.stores.size + " 店";
+  $("tc-machines").textContent = onM.length + " 機種";
+  const why = st.paused ? "一時停止中です" : !st.stores.size ? "店舗が選ばれていません" : !onM.length ? "機種が選ばれていません" : "";
+  $("summary").className = why ? "warn" : "";
+  $("summary").textContent = why ? "今は通知が届きません(" + why + ")" : `${st.stores.size} 店 × ${onM.length} 機種(狙い方 ${nAim})の通知が届きます`;
+  const dirty = snapshot() !== saved, bad = !$("minev-err").hidden;
+  $("save").disabled = !dirty || bad;
+  if (dirty) { $("state").className = ""; $("state").textContent = "まだ保存していない変更があります"; }
+}
+
+function drawChips() {
+  const box = $("chips"); box.replaceChildren();
+  if (!st.stores.size) { box.append(el("div", { className: "empty", textContent: "まだ選んでいません" })); return; }
+  const names = [...st.stores].sort((a, b) => a.localeCompare(b, "ja"));
+  const show = chipsOpen ? names : names.slice(0, CHIP_MAX);
+  const wrap = el("div", { className: "chips" });
+  for (const n of show) wrap.append(el("button", { className: "chip", textContent: n, ariaLabel: n + " を外す", onclick: () => { st.stores.delete(n); drawStores(); } }));
+  if (names.length > CHIP_MAX) wrap.append(el("button", { className: "more", textContent: chipsOpen ? "たたむ" : `ほか ${names.length - CHIP_MAX} 店を表示`, onclick: () => { chipsOpen = !chipsOpen; drawChips(); } }));
+  box.append(wrap);
+}
+
+function drawPrefs() {
+  const box = $("prefs"); box.replaceChildren();
+  const cnt = {};
+  for (const s of cfg.stores) if (st.stores.has(s.name)) cnt[prefOf(s)] = (cnt[prefOf(s)] || 0) + 1;
+  const names = [ALL, ...cfg.prefs, ...(cfg.stores.some(s => !s.pref) ? [NOPREF] : [])];
+  for (const p of names) {
+    const b = el("button", { className: "pf", ariaPressed: String(p === pref), onclick: () => { pref = p; drawStores(); } }, p);
+    if (p !== ALL && cnt[p]) b.append(" ", el("b", { textContent: cnt[p] }));
+    box.append(b);
+  }
+}
+
+function drawList() {
+  const q = norm($("q").value);
+  const hit = cfg.stores.filter(s => (pref === ALL || prefOf(s) === pref) && (!q || s.key.includes(q)));
+  const box = $("list"); box.replaceChildren();
+  for (const s of hit.slice(0, LIST_MAX)) {
+    const cb = el("input", { type: "checkbox", checked: st.stores.has(s.name) });
+    cb.onchange = () => { cb.checked ? st.stores.add(s.name) : st.stores.delete(s.name); drawChips(); drawPrefs(); drawSummary(); };
+    box.append(el("label", { className: "row" }, cb, el("span", { className: "nm", textContent: s.name }),
+      el("small", { textContent: (pref === ALL ? prefOf(s) + "・" : "") + s.units + " 台" })));
+  }
+  $("listnote").textContent = !hit.length ? "当てはまる店舗がありません" : hit.length > LIST_MAX ? `${hit.length} 店のうち ${LIST_MAX} 店を表示しています。都道府県か店舗名で絞ってください` : `${hit.length} 店`;
+}
+
+function drawStores() { drawChips(); drawPrefs(); drawList(); drawSummary(); }
+
+function sw(on, label, fn) { return el("button", { className: "sw", role: "switch", ariaChecked: String(on), ariaLabel: label, onclick: fn }); }
+
+function drawMachines() {
+  const box = $("machines"); box.replaceChildren();
+  for (const m of cfg.machines) {
+    const ms = st.machines[m.name];
+    const card = el("div", { className: "card" });
+    card.append(el("div", { className: "mc" + (ms.on ? "" : " dim") }, el("span", {}, m.name, el("br"),
+      el("small", { textContent: ms.on ? `狙い方 ${ms.aims.length} / ${m.aims.length}` : "通知しない" })),
+      sw(ms.on, m.name + " の通知", () => { ms.on = !ms.on; if (ms.on && !ms.aims.length) ms.aims = m.aims.map(a => a.code); drawMachines(); })));
+    if (ms.on) for (const a of m.aims) {
+      const on = ms.aims.includes(a.code);
+      card.append(el("div", { className: "aim" + (on ? "" : " dim") }, el("span", {}, a.name, el("small", { textContent: a.desc })),
+        sw(on, a.name + " の通知", () => { ms.aims = on ? ms.aims.filter(c => c !== a.code) : m.aims.map(x => x.code).filter(c => c === a.code || ms.aims.includes(c)); drawMachines(); })));
+    }
+    box.append(card);
+  }
+  drawSummary();
+}
+
+function drawOther() {
+  $("paused").ariaChecked = String(st.paused);
+  $("minev").value = st.min_ev ?? "";
+}
+
+for (const t of document.querySelectorAll(".tab")) t.onclick = () => {
+  for (const x of document.querySelectorAll(".tab")) x.ariaSelected = String(x === t);
+  for (const s of document.querySelectorAll("section")) s.classList.toggle("on", s.id === "sec-" + t.dataset.tab);
+  window.scrollTo(0, 0);
+};
+$("q").oninput = drawList;
+$("paused").onclick = () => { st.paused = !st.paused; drawOther(); drawSummary(); };
+$("minev").oninput = () => {
+  const v = $("minev").value.trim(), n = Number(v);
+  const bad = v !== "" && !(Number.isFinite(n) && n >= 0);
+  $("minev-err").hidden = !bad;
+  if (!bad) st.min_ev = v === "" || n === 0 ? null : n;
+  drawSummary();
+};
+
+$("save").onclick = async () => {
+  $("save").disabled = true; $("state").className = ""; $("state").textContent = "保存しています…";
+  try {
+    const j = await call("save", { settings: JSON.parse(snapshot()) });
+    if (j.status !== "ok") throw new Error(j.status);
+    load(j.user);
+    $("state").textContent = "保存しました";
+  } catch (e) {
+    $("state").className = "ng"; $("state").textContent = "保存できませんでした。もう一度押してください";
+    $("save").disabled = false;
+  }
+};
+
+function load(u) {
+  st.stores = new Set(u.stores || []);
+  st.machines = {};
+  for (const m of cfg.machines) { const v = (u.machines || {})[m.name] || {}; st.machines[m.name] = { on: !!v.on, aims: (v.aims || []).filter(c => m.aims.some(a => a.code === c)) }; }
+  st.min_ev = u.min_ev ?? null; st.paused = !!u.paused; st.send_to = u.send_to || ["line"];
+  saved = snapshot();
+  drawStores(); drawMachines(); drawOther();
+}
+
+(async () => {
+  try {
+    await identify();
+    const j = await call("load");
+    if (j.status === "pending") {
+      // 登録は済んだが、まだ承認されていない人。店舗や狙い方の一覧は渡されない
+      document.querySelector(".tabs").hidden = true; document.querySelector("footer").hidden = true;
+      for (const s of document.querySelectorAll("section")) s.classList.remove("on");
+      $("summary").className = ""; $("summary").textContent = "登録を受け付けました。承認されると設定できるようになります。";
+      return;
+    }
+    if (j.status !== "ok") throw new Error(j.status);
+    cfg = j.config; const u = j.user;
+    for (const s of cfg.stores) s.key = norm(s.name);
+    const mine = cfg.stores.find(s => (u.stores || []).includes(s.name));
+    pref = mine ? prefOf(mine) : ALL;
+    load(u);
+  } catch (e) {
+    $("summary").className = "warn"; $("summary").textContent = "読み込めませんでした。開き直してください";
+  }
+})();
+</script>
+</body>
+</html>
