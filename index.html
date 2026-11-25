@@ -116,6 +116,8 @@ const LIFF_ID = "2012801122-j3uMhbuA";
 const API_URL = "https://script.google.com/macros/s/AKfycbztRdXY4yVrfkyFKOvW2xYWyVX5bZyu59PbBLJLBegPddah7-MtbGvs0Ur5DXMtLf1X/exec";
 
 const uid = new URLSearchParams(location.search).get("uid") || "u1";
+// 開いた瞬間のアドレスからタブの指定を控えておく(LINE の本人確認の途中でアドレスが書き換わるため)
+const firstTab = (() => { const q = new URLSearchParams(location.search); return q.get("tab") || new URLSearchParams((q.get("liff.state") || "").replace(/^[/?]+/, "")).get("tab"); })();
 let idToken = null;
 
 async function identify() {
@@ -278,6 +280,12 @@ function load(u) {
     const mine = cfg.stores.find(s => (u.stores || []).includes(s.name));
     pref = mine ? prefOf(mine) : ALL;
     load(u);
+    // トーク画面のメニューから来た時は、押されたボタンに対応する画面を開く(?tab=stores / machines / other)
+    // LINE の中では、最初の一瞬だけ ?liff.state=%3Ftab%3D… の形で届くので両方を見る
+    const q = new URLSearchParams(location.search);
+    const want = q.get("tab") || new URLSearchParams((q.get("liff.state") || "").replace(/^[/?]+/, "")).get("tab") || firstTab;
+    const btn = document.querySelector(`.tab[data-tab="${want}"]`);
+    if (btn) btn.click();
   } catch (e) {
     $("summary").className = "warn"; $("summary").textContent = "読み込めませんでした。開き直してください";
   }
