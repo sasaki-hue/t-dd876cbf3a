@@ -106,6 +106,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
 <footer><div class="in">
   <button id="save" disabled>保存する</button>
   <div id="state"></div>
+  <div id="build" style="font-size:10px;color:var(--mute);text-align:center"></div>
 </div></footer>
 
 <script>
@@ -114,6 +115,9 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
 //   API_URL: 保存先の URL(Apps Script のウェブアプリ)。空なら同じサーバーの /api
 const LIFF_ID = "2012801122-j3uMhbuA";
 const API_URL = "https://script.google.com/macros/s/AKfycbztRdXY4yVrfkyFKOvW2xYWyVX5bZyu59PbBLJLBegPddah7-MtbGvs0Ur5DXMtLf1X/exec";
+// 公開した日時(publish_settings.py が書き込む)。画面の一番下に小さく出し、古い画面が表示されていないかを見分ける
+const BUILD = "11/26 05:59";
+document.addEventListener("DOMContentLoaded", () => { if (BUILD) document.getElementById("build").textContent = "版 " + BUILD; });
 
 const uid = new URLSearchParams(location.search).get("uid") || "u1";
 // 開いた瞬間のアドレスからタブの指定を控えておく(LINE の本人確認の途中でアドレスが書き換わるため)
