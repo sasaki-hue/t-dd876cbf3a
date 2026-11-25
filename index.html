@@ -56,6 +56,10 @@ section.on{display:block}
 .field.lim{padding:8px 14px 8px 26px}
 .field.lim small{display:block;font-size:12px;color:var(--mute)}
 .field.lim input::placeholder{color:var(--mute)}
+.seg{display:flex;margin:0 14px 14px 26px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{flex:1;min-height:44px;border:0;background:none;font:inherit;font-size:14px;color:var(--sub);cursor:pointer;padding:6px 4px}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-checked="true"]{background:var(--accent);color:var(--accent-ink);font-weight:600}
 footer{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:10px 12px calc(10px + env(safe-area-inset-bottom))}
 footer .in{max-width:496px;margin:0 auto}
 #save{width:100%;height:46px;border:0;border-radius:10px;background:var(--accent);color:var(--accent-ink);font:inherit;font-size:16px;font-weight:600;cursor:pointer}
@@ -130,7 +134,7 @@ body.loading #loader{display:flex}
 const LIFF_ID = "2012801122-j3uMhbuA";
 const API_URL = "https://script.google.com/macros/s/AKfycbztRdXY4yVrfkyFKOvW2xYWyVX5bZyu59PbBLJLBegPddah7-MtbGvs0Ur5DXMtLf1X/exec";
 // 公開した日時(publish_settings.py が書き込む)。画面の一番下に小さく出し、古い画面が表示されていないかを見分ける
-const BUILD = "11/26 06:42";
+const BUILD = "11/26 06:55";
 document.addEventListener("DOMContentLoaded", () => { if (BUILD) document.getElementById("build").textContent = "版 " + BUILD; });
 
 const uid = new URLSearchParams(location.search).get("uid") || "u1";
@@ -265,6 +269,13 @@ function limitBlock(m, ms) {
   };
   const box = el("div", { className: "limits" }, el("div", { className: "lbl", textContent: "通知の下限(空欄なら既定のまま。期待値は 1 枚 20 円で換算)" }));
   box.append(...row("min_roi", "ROI の下限", "%", m.default_min_roi, "1"), ...row("min_ev", "期待値の下限", "円", m.default_min_ev, "500"));
+  // 2 つの下限の組み合わせ方。既定と同じ方を選んだ時は「既定に従う」として保存する(既定が変わればそれに合わせて変わる)
+  const def = m.default_mode === "or" ? "or" : "and", cur = ms.mode || def;
+  const seg = el("div", { className: "seg", role: "radiogroup", ariaLabel: `${m.name} の下限の組み合わせ方` });
+  for (const [val, label] of [["and", "両方を満たす"], ["or", "どちらかを満たす"]])
+    seg.append(el("button", { type: "button", role: "radio", ariaChecked: String(cur === val), textContent: label + (val === def ? "(既定)" : ""),
+      onclick: () => { ms.mode = val === def ? null : val; drawMachines(); } }));
+  box.append(el("div", { className: "field lim" }, el("span", {}, "組み合わせ方", el("small", { textContent: cur === "and" ? "ROI と期待値の両方が下限以上の台" : "ROI か期待値のどちらかが下限以上の台" }))), seg);
   return box;
 }
 
@@ -295,7 +306,7 @@ $("save").onclick = async () => {
 function load(u) {
   st.stores = new Set(u.stores || []);
   st.machines = {};
-  for (const m of cfg.machines) { const v = (u.machines || {})[m.name] || {}; st.machines[m.name] = { on: !!v.on, aims: (v.aims || []).filter(c => m.aims.some(a => a.code === c)), min_ev: v.min_ev ?? null, min_roi: v.min_roi ?? null }; }
+  for (const m of cfg.machines) { const v = (u.machines || {})[m.name] || {}; st.machines[m.name] = { on: !!v.on, aims: (v.aims || []).filter(c => m.aims.some(a => a.code === c)), min_ev: v.min_ev ?? null, min_roi: v.min_roi ?? null, mode: v.mode === "and" || v.mode === "or" ? v.mode : null }; }
   badFields.clear(); st.paused = !!u.paused; st.send_to = u.send_to || ["line"];
   saved = snapshot();
   drawStores(); drawMachines(); drawOther();
