@@ -50,7 +50,7 @@ section.on{display:block}
 .sw[aria-checked="true"]{background:var(--accent)}
 .sw[aria-checked="true"]::after{left:21px}
 .field{display:flex;align-items:center;gap:10px;padding:14px}
-.field input{width:96px;height:40px;border:1px solid var(--line);border-radius:8px;padding:0 10px;font:inherit;font-size:16px;background:var(--bg);color:var(--text);text-align:right;margin-left:auto}
+.field input{width:104px;height:40px;border:1px solid var(--line);border-radius:8px;padding:0 10px;font:inherit;font-size:16px;background:var(--bg);color:var(--text);text-align:right;margin-left:auto}
 .err{color:var(--danger);font-size:13px;padding:0 14px 12px}
 .limits{border-top:1px solid var(--line)}
 .field.lim{padding:8px 14px 8px 26px}
@@ -130,7 +130,7 @@ body.loading #loader{display:flex}
 const LIFF_ID = "2012801122-j3uMhbuA";
 const API_URL = "https://script.google.com/macros/s/AKfycbztRdXY4yVrfkyFKOvW2xYWyVX5bZyu59PbBLJLBegPddah7-MtbGvs0Ur5DXMtLf1X/exec";
 // 公開した日時(publish_settings.py が書き込む)。画面の一番下に小さく出し、古い画面が表示されていないかを見分ける
-const BUILD = "11/26 06:38";
+const BUILD = "11/26 06:42";
 document.addEventListener("DOMContentLoaded", () => { if (BUILD) document.getElementById("build").textContent = "版 " + BUILD; });
 
 const uid = new URLSearchParams(location.search).get("uid") || "u1";
@@ -263,8 +263,8 @@ function limitBlock(m, ms) {
     };
     return [el("div", { className: "field lim" }, el("span", {}, label, el("small", { textContent: `既定: ${defText(def)}${def == null ? "" : unit}` })), inp, el("span", { textContent: unit })), err];
   };
-  const box = el("div", { className: "limits" }, el("div", { className: "lbl", textContent: "通知の下限(空欄なら既定のまま)" }));
-  box.append(...row("min_roi", "ROI の下限", "%", m.default_min_roi, "1"), ...row("min_ev", "期待値の下限", "枚", m.default_min_ev, "50"));
+  const box = el("div", { className: "limits" }, el("div", { className: "lbl", textContent: "通知の下限(空欄なら既定のまま。期待値は 1 枚 20 円で換算)" }));
+  box.append(...row("min_roi", "ROI の下限", "%", m.default_min_roi, "1"), ...row("min_ev", "期待値の下限", "円", m.default_min_ev, "500"));
   return box;
 }
 
