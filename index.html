@@ -10,7 +10,8 @@
 @media (prefers-color-scheme:dark){:root{--bg:#111315;--card:#1b1e21;--text:#f1f3f5;--sub:#a8b0ba;--mute:#727a85;--line:#2c3136;--chip:#12351f;--chip-ink:#7fe0a3;--danger:#ff8a80;--off:#454b52}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic UI",Meiryo,sans-serif;-webkit-text-size-adjust:100%}
-.wrap{max-width:520px;margin:0 auto;padding-bottom:96px}
+/* 下の余白は、画面下に固定した保存ボタンの帯の高さ + ゆとり。帯の高さは下のスクリプトが測って --foot に入れる */
+.wrap{max-width:520px;margin:0 auto;padding-bottom:calc(var(--foot, 130px) + 28px)}
 header{background:var(--card);padding:14px 16px 0;position:sticky;top:0;z-index:5;border-bottom:1px solid var(--line)}
 h1{font-size:17px;margin:0 0 2px}
 #summary{font-size:13px;color:var(--sub);margin:0 0 10px}
@@ -155,8 +156,16 @@ body.loading #loader{display:flex}
 const LIFF_ID = "2012801122-j3uMhbuA";
 const API_URL = "https://script.google.com/macros/s/AKfycbztRdXY4yVrfkyFKOvW2xYWyVX5bZyu59PbBLJLBegPddah7-MtbGvs0Ur5DXMtLf1X/exec";
 // 公開した日時(publish_settings.py が書き込む)。画面の一番下に小さく出し、古い画面が表示されていないかを見分ける
-const BUILD = "11/26 07:20";
+const BUILD = "11/26 07:29";
 document.addEventListener("DOMContentLoaded", () => { if (BUILD) document.getElementById("build").textContent = "版 " + BUILD; });
+// 保存ボタンの帯は画面下に固定しているので、一番下の項目が帯の下に隠れないよう、帯の高さぶん本文の下に余白を取る
+// (帯の高さは「保存しました」などの文の有無や端末の下端の余白で変わるので、変わるたびに測り直す)
+document.addEventListener("DOMContentLoaded", () => {
+  const foot = document.querySelector("footer");
+  const fit = () => document.documentElement.style.setProperty("--foot", foot.offsetHeight + "px");
+  new ResizeObserver(fit).observe(foot);
+  fit();
+});
 
 const uid = new URLSearchParams(location.search).get("uid") || "u1";
 // 開いた瞬間のアドレスからタブの指定を控えておく(LINE の本人確認の途中でアドレスが書き換わるため)
