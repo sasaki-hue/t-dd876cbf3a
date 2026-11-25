@@ -66,6 +66,12 @@ section.on{display:block}
 .seg button{flex:1;min-height:44px;border:0;background:none;font:inherit;font-size:14px;color:var(--sub);cursor:pointer;padding:6px 4px}
 .seg button+button{border-left:1px solid var(--line)}
 .seg button[aria-checked="true"]{background:var(--accent);color:var(--accent-ink);font-weight:600}
+/* カスタムが切の時: 入力不可にして薄く見せる */
+.field.lim.off>span:first-child,.field.lim.off>span:last-child{color:var(--mute)}
+.field.lim input:disabled{color:var(--mute);-webkit-text-fill-color:var(--mute);opacity:1;background:var(--bg);border-style:dashed}
+.seg.off{opacity:.55}
+.seg button:disabled{cursor:default}
+.seg.off button[aria-checked="true"]{background:var(--off);color:var(--text)}
 footer{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:10px 12px calc(10px + env(safe-area-inset-bottom))}
 footer .in{max-width:496px;margin:0 auto}
 #save{width:100%;height:46px;border:0;border-radius:10px;background:var(--accent);color:var(--accent-ink);font:inherit;font-size:16px;font-weight:600;cursor:pointer}
@@ -140,7 +146,7 @@ body.loading #loader{display:flex}
 const LIFF_ID = "2012801122-j3uMhbuA";
 const API_URL = "https://script.google.com/macros/s/AKfycbztRdXY4yVrfkyFKOvW2xYWyVX5bZyu59PbBLJLBegPddah7-MtbGvs0Ur5DXMtLf1X/exec";
 // 公開した日時(publish_settings.py が書き込む)。画面の一番下に小さく出し、古い画面が表示されていないかを見分ける
-const BUILD = "11/26 06:59";
+const BUILD = "11/26 07:06";
 document.addEventListener("DOMContentLoaded", () => { if (BUILD) document.getElementById("build").textContent = "版 " + BUILD; });
 
 const uid = new URLSearchParams(location.search).get("uid") || "u1";
@@ -257,40 +263,51 @@ function drawMachines() {
   drawSummary();
 }
 
-// 通知の下限(機種ごと)。空欄 = 既定に従う。既定は全員共通で、機種の定義に書いてある
+// 通知の下限(機種ごと)。「カスタムする」が切なら既定のまま(入力不可)、入なら自分の値を使う
 function limitBlock(m, ms) {
-  const defText = v => v == null ? "不問" : String(v);
-  const row = (key, label, unit, def, step) => {
+  const def = { min_roi: m.default_min_roi ?? null, min_ev: m.default_min_ev ?? null, mode: m.default_mode === "or" ? "or" : "and" };
+  const cur = ms.custom ? { min_roi: ms.min_roi, min_ev: ms.min_ev, mode: ms.mode || def.mode } : def;
+  const text = v => {
+    const parts = [v.min_roi != null && `ROI ${v.min_roi}% 以上`, v.min_ev != null && `期待値 ${Number(v.min_ev).toLocaleString()} 円以上`].filter(Boolean);
+    return parts.join(v.mode === "or" ? " または " : " かつ ") || "下限なし";
+  };
+  // 詳細設定は最初は畳んでおく。見出しには、今効いている条件を 1 行で出す
+  const now = el("small", { textContent: text(cur) + (ms.custom ? "" : "(既定)") });
+  const box = el("details", { className: "limits", open: openLimits.has(m.name) || [...badFields].some(id => id.startsWith(m.name + ":")) },
+    el("summary", {}, el("span", {}, "詳細設定", now)));
+  box.ontoggle = () => { box.open ? openLimits.add(m.name) : openLimits.delete(m.name); };
+
+  // カスタムの入り切り。入にした時は既定の値を入れた状態から始める。切にした時は入力した値を捨てて既定に戻す
+  box.append(el("div", { className: "field lim" }, el("span", {}, "カスタムする", el("small", { textContent: ms.custom ? "下の値を自分で決めます" : "切の間は既定のまま(入力できません)" })),
+    sw(ms.custom, m.name + " の下限をカスタムする", () => {
+      ms.custom = !ms.custom;
+      for (const k of ["min_roi", "min_ev"]) { ms[k] = ms.custom ? def[k] : null; badFields.delete(m.name + ":" + k); }
+      ms.mode = ms.custom ? def.mode : null;
+      openLimits.add(m.name); drawMachines();
+    })));
+
+  const row = (key, label, unit, step) => {
     const id = m.name + ":" + key;
-    const inp = el("input", { type: "number", inputMode: "decimal", min: "0", step, value: ms[key] ?? "", placeholder: defText(def), ariaLabel: `${m.name} の${label}` });
+    const inp = el("input", { type: "number", inputMode: "decimal", min: "0", step, value: cur[key] ?? "", placeholder: "不問", disabled: !ms.custom, ariaLabel: `${m.name} の${label}` });
     const err = el("div", { className: "err", hidden: !badFields.has(id), textContent: "0 以上の数字を入れてください" });
     inp.oninput = () => {
       const v = inp.value.trim(), n = Number(v);
       const bad = (v === "" && inp.validity.badInput) || (v !== "" && !(Number.isFinite(n) && n >= 0));
       bad ? badFields.add(id) : badFields.delete(id);
       err.hidden = !bad;
-      if (!bad) ms[key] = v === "" || n === 0 ? null : n;
+      if (!bad) { ms[key] = v === "" || n === 0 ? null : n; now.textContent = text({ min_roi: ms.min_roi, min_ev: ms.min_ev, mode: ms.mode || def.mode }); }
       drawSummary();
     };
-    return [el("div", { className: "field lim" }, el("span", {}, label, el("small", { textContent: `既定: ${defText(def)}${def == null ? "" : unit}` })), inp, el("span", { textContent: unit })), err];
+    return [el("div", { className: "field lim" + (ms.custom ? "" : " off") }, el("span", {}, label, el("small", { textContent: ms.custom ? "空欄 = 不問" : "既定の値" })), inp, el("span", { textContent: unit })), err];
   };
-  // 詳細設定は最初は畳んでおく。見出しには、今効いている条件を 1 行で出す
-  const eff = k => ms[k] ?? m["default_" + k];
-  const parts = [eff("min_roi") != null && `ROI ${eff("min_roi")}% 以上`, eff("min_ev") != null && `期待値 ${Number(eff("min_ev")).toLocaleString()} 円以上`].filter(Boolean);
-  const custom = ms.min_roi != null || ms.min_ev != null || ms.mode != null;
-  const now = (parts.join((ms.mode || m.default_mode) === "or" ? " または " : " かつ ") || "下限なし") + (custom ? "" : "(既定)");
-  const box = el("details", { className: "limits", open: openLimits.has(m.name) || [...badFields].some(id => id.startsWith(m.name + ":")) },
-    el("summary", {}, el("span", {}, "詳細設定", el("small", { textContent: now }))),
-    el("div", { className: "lbl", textContent: "通知の下限(空欄なら既定のまま。期待値は 1 枚 20 円で換算)" }));
-  box.ontoggle = () => { box.open ? openLimits.add(m.name) : openLimits.delete(m.name); };
-  box.append(...row("min_roi", "ROI の下限", "%", m.default_min_roi, "1"), ...row("min_ev", "期待値の下限", "円", m.default_min_ev, "500"));
-  // 2 つの下限の組み合わせ方。既定と同じ方を選んだ時は「既定に従う」として保存する(既定が変わればそれに合わせて変わる)
-  const def = m.default_mode === "or" ? "or" : "and", cur = ms.mode || def;
-  const seg = el("div", { className: "seg", role: "radiogroup", ariaLabel: `${m.name} の下限の組み合わせ方` });
+  box.append(...row("min_roi", "ROI の下限", "%", "1"), ...row("min_ev", "期待値の下限", "円", "500"));
+
+  const seg = el("div", { className: "seg" + (ms.custom ? "" : " off"), role: "radiogroup", ariaLabel: `${m.name} の下限の組み合わせ方` });
   for (const [val, label] of [["and", "両方を満たす"], ["or", "どちらかを満たす"]])
-    seg.append(el("button", { type: "button", role: "radio", ariaChecked: String(cur === val), textContent: label + (val === def ? "(既定)" : ""),
-      onclick: () => { ms.mode = val === def ? null : val; drawMachines(); } }));
-  box.append(el("div", { className: "field lim" }, el("span", {}, "組み合わせ方", el("small", { textContent: cur === "and" ? "ROI と期待値の両方が下限以上の台" : "ROI か期待値のどちらかが下限以上の台" }))), seg);
+    seg.append(el("button", { type: "button", role: "radio", ariaChecked: String(cur.mode === val), textContent: label, disabled: !ms.custom,
+      onclick: () => { ms.mode = val; drawMachines(); } }));
+  box.append(el("div", { className: "field lim" + (ms.custom ? "" : " off") }, el("span", {}, "組み合わせ方", el("small", { textContent: cur.mode === "and" ? "ROI と期待値の両方が下限以上の台" : "ROI か期待値のどちらかが下限以上の台" }))), seg,
+    el("div", { className: "note", textContent: "期待値は 1 枚 20 円で換算しています。" }));
   return box;
 }
 
@@ -321,7 +338,9 @@ $("save").onclick = async () => {
 function load(u) {
   st.stores = new Set(u.stores || []);
   st.machines = {};
-  for (const m of cfg.machines) { const v = (u.machines || {})[m.name] || {}; st.machines[m.name] = { on: !!v.on, aims: (v.aims || []).filter(c => m.aims.some(a => a.code === c)), min_ev: v.min_ev ?? null, min_roi: v.min_roi ?? null, mode: v.mode === "and" || v.mode === "or" ? v.mode : null }; }
+  for (const m of cfg.machines) { const v = (u.machines || {})[m.name] || {}; st.machines[m.name] = { on: !!v.on, aims: (v.aims || []).filter(c => m.aims.some(a => a.code === c)), custom: typeof v.custom === "boolean" ? v.custom : (v.min_ev != null || v.min_roi != null || v.mode === "and" || v.mode === "or"),
+      min_ev: v.min_ev ?? null, min_roi: v.min_roi ?? null, mode: v.mode === "and" || v.mode === "or" ? v.mode : null };
+    const x = st.machines[m.name]; if (!x.custom) { x.min_ev = x.min_roi = x.mode = null; } }
   badFields.clear(); st.paused = !!u.paused; st.send_to = u.send_to || ["line"];
   saved = snapshot();
   drawStores(); drawMachines(); drawOther();
