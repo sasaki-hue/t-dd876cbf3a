@@ -113,7 +113,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
 //   LIFF_ID: LINE の中で開くための ID(LINE Developers で発行)。空なら PC 内の試験用(アドレスの uid を使う)
 //   API_URL: 保存先の URL(Apps Script のウェブアプリ)。空なら同じサーバーの /api
 const LIFF_ID = "2012801122-j3uMhbuA";
-const API_URL = "";
+const API_URL = "https://script.google.com/macros/s/AKfycbztRdXY4yVrfkyFKOvW2xYWyVX5bZyu59PbBLJLBegPddah7-MtbGvs0Ur5DXMtLf1X/exec";
 
 const uid = new URLSearchParams(location.search).get("uid") || "u1";
 let idToken = null;
