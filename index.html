@@ -70,6 +70,9 @@ section.on{display:block}
 .field.lim.off>span:first-child,.field.lim.off>span:last-child{color:var(--mute)}
 .field.lim input:disabled{color:var(--mute);-webkit-text-fill-color:var(--mute);opacity:1;background:var(--bg);border-style:dashed}
 .seg.off{opacity:.55}
+.gnow{font-size:13px;color:var(--sub);padding:0 14px 10px}
+#glimits .field.lim{padding-left:14px}
+#glimits .seg{margin-left:14px}
 .seg button:disabled{cursor:default}
 .seg.off button[aria-checked="true"]{background:var(--off);color:var(--text)}
 footer{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:10px 12px calc(10px + env(safe-area-inset-bottom))}
@@ -103,7 +106,7 @@ body.loading #loader{display:flex}
     <div class="tabs" role="tablist">
       <button class="tab" role="tab" data-tab="stores" aria-selected="true">店舗 <small id="tc-stores"></small></button>
       <button class="tab" role="tab" data-tab="machines" aria-selected="false">機種 <small id="tc-machines"></small></button>
-      <button class="tab" role="tab" data-tab="other" aria-selected="false">受け取り方</button>
+      <button class="tab" role="tab" data-tab="other" aria-selected="false">全体設定</button>
     </div>
   </header>
 
@@ -123,10 +126,16 @@ body.loading #loader{display:flex}
 
   <section id="sec-machines">
     <div id="machines"></div>
-    <p class="note" style="border:0">機種を「入」にすると、狙い方ごとの入り切りと、通知の下限(ROI・期待値)を選べます。</p>
+    <p class="note" style="border:0">機種を「入」にすると、狙い方ごとに通知を選べます。通知の下限は「全体設定」で決めます。その機種だけ変えたい時は詳細設定を使います。</p>
   </section>
 
   <section id="sec-other">
+    <div class="card">
+      <div class="lbl">通知の下限(すべての機種に共通)</div>
+      <div class="gnow" id="gnow"></div>
+      <div id="glimits"></div>
+    </div>
+    <p class="note" style="border:0">特定の機種だけ変えたい時は、「機種」の詳細設定で「この機種だけ変える」を入にします。</p>
     <div class="card">
       <div class="mc"><span>通知を一時停止する<br><small>設定は残したまま、すべての通知を止めます</small></span><button class="sw" id="paused" role="switch" aria-checked="false" aria-label="通知を一時停止する"></button></div>
     </div>
@@ -146,7 +155,7 @@ body.loading #loader{display:flex}
 const LIFF_ID = "2012801122-j3uMhbuA";
 const API_URL = "https://script.google.com/macros/s/AKfycbztRdXY4yVrfkyFKOvW2xYWyVX5bZyu59PbBLJLBegPddah7-MtbGvs0Ur5DXMtLf1X/exec";
 // 公開した日時(publish_settings.py が書き込む)。画面の一番下に小さく出し、古い画面が表示されていないかを見分ける
-const BUILD = "11/26 07:06";
+const BUILD = "11/26 07:20";
 document.addEventListener("DOMContentLoaded", () => { if (BUILD) document.getElementById("build").textContent = "版 " + BUILD; });
 
 const uid = new URLSearchParams(location.search).get("uid") || "u1";
@@ -154,7 +163,7 @@ const uid = new URLSearchParams(location.search).get("uid") || "u1";
 const firstTab = (() => { const q = new URLSearchParams(location.search); return q.get("tab") || new URLSearchParams((q.get("liff.state") || "").replace(/^[/?]+/, "")).get("tab"); })();
 // 待機画面には、押されたボタンの名前を出す
 document.addEventListener("DOMContentLoaded", () => {
-  const name = { stores: "店舗を選ぶ", machines: "機種を選ぶ", other: "受け取り方" }[firstTab];
+  const name = { stores: "店舗を選ぶ", machines: "機種を選ぶ", other: "全体設定" }[firstTab];
   if (name) document.getElementById("loader-title").textContent = name;
 });
 let idToken = null;
@@ -184,11 +193,11 @@ const norm = s => s.normalize("NFKC").toLowerCase().replace(/\s+/g, "");
 const NOPREF = "未設定", ALL = "すべて", LIST_MAX = 60, CHIP_MAX = 8;
 
 let cfg = null, saved = "", pref = ALL, chipsOpen = false;
-const st = { stores: new Set(), machines: {}, paused: false, send_to: ["line"] };
+const st = { stores: new Set(), machines: {}, limits: { custom: false, min_roi: null, min_ev: null, mode: null }, paused: false, send_to: ["line"] };
 const badFields = new Set();    // 数字として正しくない入力欄(あれば保存させない)
 const openLimits = new Set();   // 詳細設定を開いている機種(画面を描き直しても開いたままにする)
 
-const snapshot = () => JSON.stringify({ stores: [...st.stores].sort(), machines: st.machines, paused: st.paused, send_to: st.send_to });
+const snapshot = () => JSON.stringify({ stores: [...st.stores].sort(), machines: st.machines, limits: st.limits, paused: st.paused, send_to: st.send_to });
 const prefOf = s => s.pref || NOPREF;
 
 function drawSummary() {
@@ -263,56 +272,77 @@ function drawMachines() {
   drawSummary();
 }
 
-// 通知の下限(機種ごと)。「カスタムする」が切なら既定のまま(入力不可)、入なら自分の値を使う
-function limitBlock(m, ms) {
-  const def = { min_roi: m.default_min_roi ?? null, min_ev: m.default_min_ev ?? null, mode: m.default_mode === "or" ? "or" : "and" };
-  const cur = ms.custom ? { min_roi: ms.min_roi, min_ev: ms.min_ev, mode: ms.mode || def.mode } : def;
-  const text = v => {
-    const parts = [v.min_roi != null && `ROI ${v.min_roi}% 以上`, v.min_ev != null && `期待値 ${Number(v.min_ev).toLocaleString()} 円以上`].filter(Boolean);
-    return parts.join(v.mode === "or" ? " または " : " かつ ") || "下限なし";
-  };
-  // 詳細設定は最初は畳んでおく。見出しには、今効いている条件を 1 行で出す
-  const now = el("small", { textContent: text(cur) + (ms.custom ? "" : "(既定)") });
-  const box = el("details", { className: "limits", open: openLimits.has(m.name) || [...badFields].some(id => id.startsWith(m.name + ":")) },
-    el("summary", {}, el("span", {}, "詳細設定", now)));
-  box.ontoggle = () => { box.open ? openLimits.add(m.name) : openLimits.delete(m.name); };
+// ---- 通知の下限。使われるのは 1 組だけ: その機種だけ変えていればそれ、なければ各自の全体設定、それも無ければ既定
+const limText = v => {
+  const parts = [v.min_roi != null && `ROI ${v.min_roi}% 以上`, v.min_ev != null && `期待値 ${Number(v.min_ev).toLocaleString()} 円以上`].filter(Boolean);
+  return parts.join(v.mode === "or" ? " または " : " かつ ") || "下限なし";
+};
+// s = 入力されている状態、base = 切の時に使われる値。今効いている値を返す
+const effLimits = (s, base) => s.custom ? { min_roi: s.min_roi, min_ev: s.min_ev, mode: s.mode || base.mode } : base;
+const normLimits = v => {
+  v = v || {};
+  const custom = typeof v.custom === "boolean" ? v.custom : (v.min_ev != null || v.min_roi != null || v.mode === "and" || v.mode === "or");
+  return custom ? { custom, min_roi: v.min_roi ?? null, min_ev: v.min_ev ?? null, mode: v.mode === "or" ? "or" : v.mode === "and" ? "and" : null }
+                : { custom, min_roi: null, min_ev: null, mode: null };
+};
 
-  // カスタムの入り切り。入にした時は既定の値を入れた状態から始める。切にした時は入力した値を捨てて既定に戻す
-  box.append(el("div", { className: "field lim" }, el("span", {}, "カスタムする", el("small", { textContent: ms.custom ? "下の値を自分で決めます" : "切の間は既定のまま(入力できません)" })),
-    sw(ms.custom, m.name + " の下限をカスタムする", () => {
-      ms.custom = !ms.custom;
-      for (const k of ["min_roi", "min_ev"]) { ms[k] = ms.custom ? def[k] : null; badFields.delete(m.name + ":" + k); }
-      ms.mode = ms.custom ? def.mode : null;
-      openLimits.add(m.name); drawMachines();
+// 下限の入力欄 1 組(全体設定と、機種ごとの詳細設定の両方で使う)。切り替えが切の間は base の値を薄く見せて入力不可にする
+function limitsEditor(id, s, base, labels, redraw, onChange) {
+  const cur = effLimits(s, base);
+  const box = el("div", {});
+  box.append(el("div", { className: "field lim" }, el("span", {}, labels.toggle, el("small", { textContent: s.custom ? labels.on : labels.off })),
+    sw(s.custom, labels.aria, () => {
+      s.custom = !s.custom;
+      // 入にした時は base の値を入れた状態から始める。切にした時は入力した値を捨てる
+      for (const k of ["min_roi", "min_ev"]) { s[k] = s.custom ? base[k] : null; badFields.delete(id + ":" + k); }
+      s.mode = s.custom ? base.mode : null;
+      redraw();
     })));
-
   const row = (key, label, unit, step) => {
-    const id = m.name + ":" + key;
-    const inp = el("input", { type: "number", inputMode: "decimal", min: "0", step, value: cur[key] ?? "", placeholder: "不問", disabled: !ms.custom, ariaLabel: `${m.name} の${label}` });
-    const err = el("div", { className: "err", hidden: !badFields.has(id), textContent: "0 以上の数字を入れてください" });
+    const fid = id + ":" + key;
+    const inp = el("input", { type: "number", inputMode: "decimal", min: "0", step, value: cur[key] ?? "", placeholder: "不問", disabled: !s.custom, ariaLabel: `${labels.scope}の${label}` });
+    const err = el("div", { className: "err", hidden: !badFields.has(fid), textContent: "0 以上の数字を入れてください" });
     inp.oninput = () => {
       const v = inp.value.trim(), n = Number(v);
       const bad = (v === "" && inp.validity.badInput) || (v !== "" && !(Number.isFinite(n) && n >= 0));
-      bad ? badFields.add(id) : badFields.delete(id);
+      bad ? badFields.add(fid) : badFields.delete(fid);
       err.hidden = !bad;
-      if (!bad) { ms[key] = v === "" || n === 0 ? null : n; now.textContent = text({ min_roi: ms.min_roi, min_ev: ms.min_ev, mode: ms.mode || def.mode }); }
+      if (!bad) { s[key] = v === "" || n === 0 ? null : n; onChange(); }
       drawSummary();
     };
-    return [el("div", { className: "field lim" + (ms.custom ? "" : " off") }, el("span", {}, label, el("small", { textContent: ms.custom ? "空欄 = 不問" : "既定の値" })), inp, el("span", { textContent: unit })), err];
+    return [el("div", { className: "field lim" + (s.custom ? "" : " off") }, el("span", {}, label, el("small", { textContent: s.custom ? "空欄 = 不問" : labels.base })), inp, el("span", { textContent: unit })), err];
   };
   box.append(...row("min_roi", "ROI の下限", "%", "1"), ...row("min_ev", "期待値の下限", "円", "500"));
-
-  const seg = el("div", { className: "seg" + (ms.custom ? "" : " off"), role: "radiogroup", ariaLabel: `${m.name} の下限の組み合わせ方` });
+  const seg = el("div", { className: "seg" + (s.custom ? "" : " off"), role: "radiogroup", ariaLabel: `${labels.scope}の下限の組み合わせ方` });
   for (const [val, label] of [["and", "両方を満たす"], ["or", "どちらかを満たす"]])
-    seg.append(el("button", { type: "button", role: "radio", ariaChecked: String(cur.mode === val), textContent: label, disabled: !ms.custom,
-      onclick: () => { ms.mode = val; drawMachines(); } }));
-  box.append(el("div", { className: "field lim" + (ms.custom ? "" : " off") }, el("span", {}, "組み合わせ方", el("small", { textContent: cur.mode === "and" ? "ROI と期待値の両方が下限以上の台" : "ROI か期待値のどちらかが下限以上の台" }))), seg,
+    seg.append(el("button", { type: "button", role: "radio", ariaChecked: String(cur.mode === val), textContent: label, disabled: !s.custom,
+      onclick: () => { s.mode = val; redraw(); } }));
+  box.append(el("div", { className: "field lim" + (s.custom ? "" : " off") }, el("span", {}, "組み合わせ方", el("small", { textContent: cur.mode === "and" ? "ROI と期待値の両方が下限以上の台" : "ROI か期待値のどちらかが下限以上の台" }))), seg,
     el("div", { className: "note", textContent: "期待値は 1 枚 20 円で換算しています。" }));
+  return box;
+}
+
+// 機種ごとの詳細設定: 全体設定に対して、その機種だけ変えたい時に使う。最初は畳んでおく
+function limitBlock(m, ms) {
+  const g = effLimits(st.limits, cfg.defaults);
+  const now = el("small", {});
+  const setNow = () => { now.textContent = ms.custom ? limText(effLimits(ms, g)) : `全体設定のまま(${limText(g)})`; };
+  setNow();
+  const box = el("details", { className: "limits", open: openLimits.has(m.name) || [...badFields].some(id => id.startsWith(m.name + ":")) },
+    el("summary", {}, el("span", {}, "詳細設定", now)));
+  box.ontoggle = () => { box.open ? openLimits.add(m.name) : openLimits.delete(m.name); };
+  box.append(limitsEditor(m.name, ms, g, { scope: m.name + " ", toggle: "この機種だけ変える", on: "下の値をこの機種に使います", off: "切の間は全体設定のまま(入力できません)",
+    aria: m.name + " だけ通知の下限を変える", base: "全体設定の値" }, () => { openLimits.add(m.name); drawMachines(); }, setNow));
   return box;
 }
 
 function drawOther() {
   $("paused").ariaChecked = String(st.paused);
+  const setNow = () => { $("gnow").textContent = "今の条件: " + limText(effLimits(st.limits, cfg.defaults)) + (st.limits.custom ? "" : "(既定)"); };
+  setNow();
+  // 全体設定を変えると、機種ごとの「全体設定のまま」の表示も変わるので、機種の画面も描き直す
+  $("glimits").replaceChildren(limitsEditor("全体", st.limits, cfg.defaults, { scope: "全体設定 ", toggle: "カスタムする", on: "下の値を自分で決めます", off: "切の間は既定のまま(入力できません)",
+    aria: "全体の通知の下限をカスタムする", base: "既定の値" }, () => { drawOther(); drawMachines(); }, () => { setNow(); drawMachines(); }));
 }
 
 for (const t of document.querySelectorAll(".tab")) t.onclick = () => {
@@ -338,9 +368,8 @@ $("save").onclick = async () => {
 function load(u) {
   st.stores = new Set(u.stores || []);
   st.machines = {};
-  for (const m of cfg.machines) { const v = (u.machines || {})[m.name] || {}; st.machines[m.name] = { on: !!v.on, aims: (v.aims || []).filter(c => m.aims.some(a => a.code === c)), custom: typeof v.custom === "boolean" ? v.custom : (v.min_ev != null || v.min_roi != null || v.mode === "and" || v.mode === "or"),
-      min_ev: v.min_ev ?? null, min_roi: v.min_roi ?? null, mode: v.mode === "and" || v.mode === "or" ? v.mode : null };
-    const x = st.machines[m.name]; if (!x.custom) { x.min_ev = x.min_roi = x.mode = null; } }
+  for (const m of cfg.machines) { const v = (u.machines || {})[m.name] || {}; st.machines[m.name] = { on: !!v.on, aims: (v.aims || []).filter(c => m.aims.some(a => a.code === c)), ...normLimits(v) }; }
+  st.limits = normLimits(u.limits);
   badFields.clear(); st.paused = !!u.paused; st.send_to = u.send_to || ["line"];
   saved = snapshot();
   drawStores(); drawMachines(); drawOther();
