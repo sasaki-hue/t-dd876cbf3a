@@ -53,6 +53,12 @@ section.on{display:block}
 .field input{width:104px;height:40px;border:1px solid var(--line);border-radius:8px;padding:0 10px;font:inherit;font-size:16px;background:var(--bg);color:var(--text);text-align:right;margin-left:auto}
 .err{color:var(--danger);font-size:13px;padding:0 14px 12px}
 .limits{border-top:1px solid var(--line)}
+.limits summary{display:flex;align-items:center;gap:10px;padding:12px 14px 12px 26px;cursor:pointer;list-style:none;font-size:14px;min-height:48px}
+.limits summary::-webkit-details-marker{display:none}
+.limits summary>span{flex:1;min-width:0}
+.limits summary small{display:block;font-size:12px;color:var(--mute);overflow-wrap:anywhere}
+.limits summary::after{content:"";margin-left:auto;width:9px;height:9px;border-right:2px solid var(--sub);border-bottom:2px solid var(--sub);transform:rotate(45deg);transition:transform .12s;flex:none}
+.limits[open] summary::after{transform:rotate(-135deg)}
 .field.lim{padding:8px 14px 8px 26px}
 .field.lim small{display:block;font-size:12px;color:var(--mute)}
 .field.lim input::placeholder{color:var(--mute)}
@@ -134,7 +140,7 @@ body.loading #loader{display:flex}
 const LIFF_ID = "2012801122-j3uMhbuA";
 const API_URL = "https://script.google.com/macros/s/AKfycbztRdXY4yVrfkyFKOvW2xYWyVX5bZyu59PbBLJLBegPddah7-MtbGvs0Ur5DXMtLf1X/exec";
 // 公開した日時(publish_settings.py が書き込む)。画面の一番下に小さく出し、古い画面が表示されていないかを見分ける
-const BUILD = "11/26 06:55";
+const BUILD = "11/26 06:59";
 document.addEventListener("DOMContentLoaded", () => { if (BUILD) document.getElementById("build").textContent = "版 " + BUILD; });
 
 const uid = new URLSearchParams(location.search).get("uid") || "u1";
@@ -174,6 +180,7 @@ const NOPREF = "未設定", ALL = "すべて", LIST_MAX = 60, CHIP_MAX = 8;
 let cfg = null, saved = "", pref = ALL, chipsOpen = false;
 const st = { stores: new Set(), machines: {}, paused: false, send_to: ["line"] };
 const badFields = new Set();    // 数字として正しくない入力欄(あれば保存させない)
+const openLimits = new Set();   // 詳細設定を開いている機種(画面を描き直しても開いたままにする)
 
 const snapshot = () => JSON.stringify({ stores: [...st.stores].sort(), machines: st.machines, paused: st.paused, send_to: st.send_to });
 const prefOf = s => s.pref || NOPREF;
@@ -267,7 +274,15 @@ function limitBlock(m, ms) {
     };
     return [el("div", { className: "field lim" }, el("span", {}, label, el("small", { textContent: `既定: ${defText(def)}${def == null ? "" : unit}` })), inp, el("span", { textContent: unit })), err];
   };
-  const box = el("div", { className: "limits" }, el("div", { className: "lbl", textContent: "通知の下限(空欄なら既定のまま。期待値は 1 枚 20 円で換算)" }));
+  // 詳細設定は最初は畳んでおく。見出しには、今効いている条件を 1 行で出す
+  const eff = k => ms[k] ?? m["default_" + k];
+  const parts = [eff("min_roi") != null && `ROI ${eff("min_roi")}% 以上`, eff("min_ev") != null && `期待値 ${Number(eff("min_ev")).toLocaleString()} 円以上`].filter(Boolean);
+  const custom = ms.min_roi != null || ms.min_ev != null || ms.mode != null;
+  const now = (parts.join((ms.mode || m.default_mode) === "or" ? " または " : " かつ ") || "下限なし") + (custom ? "" : "(既定)");
+  const box = el("details", { className: "limits", open: openLimits.has(m.name) || [...badFields].some(id => id.startsWith(m.name + ":")) },
+    el("summary", {}, el("span", {}, "詳細設定", el("small", { textContent: now }))),
+    el("div", { className: "lbl", textContent: "通知の下限(空欄なら既定のまま。期待値は 1 枚 20 円で換算)" }));
+  box.ontoggle = () => { box.open ? openLimits.add(m.name) : openLimits.delete(m.name); };
   box.append(...row("min_roi", "ROI の下限", "%", m.default_min_roi, "1"), ...row("min_ev", "期待値の下限", "円", m.default_min_ev, "500"));
   // 2 つの下限の組み合わせ方。既定と同じ方を選んだ時は「既定に従う」として保存する(既定が変わればそれに合わせて変わる)
   const def = m.default_mode === "or" ? "or" : "and", cur = ms.mode || def;
