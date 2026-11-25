@@ -59,9 +59,23 @@ footer .in{max-width:496px;margin:0 auto}
 #state{font-size:12px;color:var(--sub);text-align:center;margin-top:6px;min-height:18px}
 #state.ng{color:var(--danger)}
 button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* 読み込み中: 中身は出さず、待機画面だけを見せる(読み込み前の空の画面や、途中で画面が切り替わる動きを見せない) */
+body.loading header,body.loading section,body.loading footer{display:none}
+#loader{display:none;min-height:100vh;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:24px;text-align:center}
+body.loading #loader{display:flex}
+.spin{width:44px;height:44px;border-radius:50%;border:4px solid var(--line);border-top-color:var(--accent);animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation-duration:2.4s}}
+#loader b{font-size:17px}
+#loader span{font-size:13px;color:var(--sub)}
 </style>
 </head>
-<body>
+<body class="loading">
+<div id="loader" role="status" aria-live="polite">
+  <div class="spin" aria-hidden="true"></div>
+  <b id="loader-title">通知設定</b>
+  <span>読み込んでいます…</span>
+</div>
 <div class="wrap">
   <header>
     <h1>通知設定</h1>
@@ -116,12 +130,17 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
 const LIFF_ID = "2012801122-j3uMhbuA";
 const API_URL = "https://script.google.com/macros/s/AKfycbztRdXY4yVrfkyFKOvW2xYWyVX5bZyu59PbBLJLBegPddah7-MtbGvs0Ur5DXMtLf1X/exec";
 // 公開した日時(publish_settings.py が書き込む)。画面の一番下に小さく出し、古い画面が表示されていないかを見分ける
-const BUILD = "11/26 05:59";
+const BUILD = "11/26 06:07";
 document.addEventListener("DOMContentLoaded", () => { if (BUILD) document.getElementById("build").textContent = "版 " + BUILD; });
 
 const uid = new URLSearchParams(location.search).get("uid") || "u1";
 // 開いた瞬間のアドレスからタブの指定を控えておく(LINE の本人確認の途中でアドレスが書き換わるため)
 const firstTab = (() => { const q = new URLSearchParams(location.search); return q.get("tab") || new URLSearchParams((q.get("liff.state") || "").replace(/^[/?]+/, "")).get("tab"); })();
+// 待機画面には、押されたボタンの名前を出す
+document.addEventListener("DOMContentLoaded", () => {
+  const name = { stores: "店舗を選ぶ", machines: "機種を選ぶ", other: "受け取り方" }[firstTab];
+  if (name) document.getElementById("loader-title").textContent = name;
+});
 let idToken = null;
 
 async function identify() {
@@ -276,6 +295,7 @@ function load(u) {
       document.querySelector(".tabs").hidden = true; document.querySelector("footer").hidden = true;
       for (const s of document.querySelectorAll("section")) s.classList.remove("on");
       $("summary").className = ""; $("summary").textContent = "登録を受け付けました。承認されると設定できるようになります。";
+      document.body.classList.remove("loading");
       return;
     }
     if (j.status !== "ok") throw new Error(j.status);
@@ -290,8 +310,12 @@ function load(u) {
     const want = q.get("tab") || new URLSearchParams((q.get("liff.state") || "").replace(/^[/?]+/, "")).get("tab") || firstTab;
     const btn = document.querySelector(`.tab[data-tab="${want}"]`);
     if (btn) btn.click();
+    document.body.classList.remove("loading");      // 開く画面を決めてから、待機画面を外す
   } catch (e) {
+    document.querySelector(".tabs").hidden = true; document.querySelector("footer").hidden = true;
+    for (const s of document.querySelectorAll("section")) s.classList.remove("on");
     $("summary").className = "warn"; $("summary").textContent = "読み込めませんでした。開き直してください";
+    document.body.classList.remove("loading");
   }
 })();
 </script>
