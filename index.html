@@ -156,7 +156,7 @@ body.loading #loader{display:flex}
 const LIFF_ID = "2012801122-j3uMhbuA";
 const API_URL = "https://script.google.com/macros/s/AKfycbztRdXY4yVrfkyFKOvW2xYWyVX5bZyu59PbBLJLBegPddah7-MtbGvs0Ur5DXMtLf1X/exec";
 // 公開した日時(publish_settings.py が書き込む)。画面の一番下に小さく出し、古い画面が表示されていないかを見分ける
-const BUILD = "11/26 07:29";
+const BUILD = "11/27 06:48";
 document.addEventListener("DOMContentLoaded", () => { if (BUILD) document.getElementById("build").textContent = "版 " + BUILD; });
 // 保存ボタンの帯は画面下に固定しているので、一番下の項目が帯の下に隠れないよう、帯の高さぶん本文の下に余白を取る
 // (帯の高さは「保存しました」などの文の有無や端末の下端の余白で変わるので、変わるたびに測り直す)
@@ -253,7 +253,7 @@ function drawList() {
     const cb = el("input", { type: "checkbox", checked: st.stores.has(s.name) });
     cb.onchange = () => { cb.checked ? st.stores.add(s.name) : st.stores.delete(s.name); drawChips(); drawPrefs(); drawSummary(); };
     box.append(el("label", { className: "row" }, cb, el("span", { className: "nm", textContent: s.name }),
-      el("small", { textContent: (pref === ALL ? prefOf(s) + "・" : "") + s.units + " 台" })));
+      el("small", { textContent: pref === ALL ? prefOf(s) : "" })));
   }
   $("listnote").textContent = !hit.length ? "当てはまる店舗がありません" : hit.length > LIST_MAX ? `${hit.length} 店のうち ${LIST_MAX} 店を表示しています。都道府県か店舗名で絞ってください` : `${hit.length} 店`;
 }
